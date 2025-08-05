@@ -5,7 +5,7 @@
 ## Notes-ruRU: Фреймворк для чата.
 ## Notes: A framework for chat frame modules.
 ## Notes-frFR: Framework pour des modules concernant les fentres de discussion
-## Version: v1.0.9
+## Version: v1.0.10
 ## Author: Prat Development Team, laytya
 
 ## X-Category: Chat/Communication
@@ -54,8 +54,8 @@ modules\TellTarget.lua
 modules\Timestamps.lua
 modules\UrlCopy.lua
 modules\Who.lua
-modules\Border.lua
 modules\LFGAlerts.lua
+modules\Border.lua
 
 frames\who.xml
 frames\popup.xml
