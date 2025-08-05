@@ -89,7 +89,8 @@ L:RegisterTranslations("ruRU", function() return {
     ["Toggle the module on and off."] = "Вкл/Выкл модуль.",
 } end)
 
-Prat_LFGAlerts = Prat:NewModule("lfgalerts")
+Prat_LFGAlerts = Prat:NewModule("LFGAlerts")
+
 
 function Prat_LFGAlerts:OnInitialize()
     self.db = Prat:AcquireDBNamespace("LFGAlerts")

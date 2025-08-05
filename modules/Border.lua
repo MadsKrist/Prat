@@ -4,6 +4,7 @@ Author: MadsKrist
 Description: Module for Prat that makes chat window borders square or removes them entirely.
 Dependencies: Prat
 ]]
+DEFAULT_CHAT_FRAME:AddMessage("DEBUG: Border.lua file is being loaded...", 1, 1, 0)
 
 local L = AceLibrary("AceLocale-2.2"):new("PratSquareBorder")
 
