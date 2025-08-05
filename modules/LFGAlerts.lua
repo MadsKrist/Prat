@@ -5,6 +5,8 @@ Description: Module for Prat that alerts when messages in LFG chat window match 
 Dependencies: Prat
 ]]
 
+DEFAULT_CHAT_FRAME:AddMessage("DEBUG: LFGAlerts.lua file is being loaded...", 1, 1, 0)
+
 local L = AceLibrary("AceLocale-2.2"):new("PratLFGAlerts")
 
 L:RegisterTranslations("enUS", function() return {
