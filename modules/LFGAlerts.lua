@@ -1,11 +1,9 @@
 --[[
-Name: LFG
-Author: MadsKrist
+Name: Prat_LFGAlerts
+Author: Custom
 Description: Module for Prat that alerts when messages in LFG chat window match specified filters.
 Dependencies: Prat
 ]]
-
-DEFAULT_CHAT_FRAME:AddMessage("DEBUG: LFGAlerts.lua file is being loaded...", 1, 1, 0)
 
 local L = AceLibrary("AceLocale-2.2"):new("PratLFGAlerts")
 
@@ -23,7 +21,7 @@ L:RegisterTranslations("enUS", function() return {
     ["KARA 40"] = true,
     ["MC"] = true,
     ["ES"] = true,
-    ["ONY"] = true,
+    ["ZG"] = true,
     ["Alert Type"] = true,
     ["Choose how to be alerted when a match is found."] = true,
     ["Sound Alert"] = true,
@@ -89,8 +87,7 @@ L:RegisterTranslations("ruRU", function() return {
     ["Toggle the module on and off."] = "Вкл/Выкл модуль.",
 } end)
 
-Prat_LFGAlerts = Prat:NewModule("LFGAlerts")
-
+Prat_LFGAlerts = Prat:NewModule("lfgalerts")
 
 function Prat_LFGAlerts:OnInitialize()
     self.db = Prat:AcquireDBNamespace("LFGAlerts")
@@ -106,6 +103,7 @@ function Prat_LFGAlerts:OnInitialize()
             mc = true,
             es = true,
             ony = true,
+            zg = true,
         },
         soundalert = true,
         soundfile = "Tell",
@@ -212,6 +210,14 @@ function Prat_LFGAlerts:OnInitialize()
                         order = 80,
                         get = function() return self.db.profile.raids.ony end,
                         set = function(v) self.db.profile.raids.ony = v end,
+                    },
+                    zg = {
+                        name = L["ZG"],
+                        desc = "Monitor for ZG (Zul'Gurub)",
+                        type = "toggle",
+                        order = 90,
+                        get = function() return self.db.profile.raids.zg end,
+                        set = function(v) self.db.profile.raids.zg = v end,
                     },
                 },
             },
@@ -441,6 +447,7 @@ function Prat_LFGAlerts:CheckFilters(message)
         mc = {"MC", "Molten Core", "Molten", "Ragnaros"},
         es = {"ES", "Emerald Sanctum", "Emerald", "Dream"},
         ony = {"ONY", "Onyxia", "Onyxia's Lair"},
+        zg = {"ZG", "Zul'Gurub", "Zul Gurub", "Gurub"},
     }
     
     for raidKey, keywords in pairs(raidKeywords) do
