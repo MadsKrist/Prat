@@ -21,6 +21,7 @@ L:RegisterTranslations("enUS", function() return {
     ["KARA 40"] = true,
     ["MC"] = true,
     ["ES"] = true,
+    ["ONY"] = true,
     ["ZG"] = true,
     ["Alert Type"] = true,
     ["Choose how to be alerted when a match is found."] = true,
@@ -60,31 +61,6 @@ L:RegisterTranslations("enUS", function() return {
     ["Auction"] = true,
     ["Level Up"] = true,
     ["Custom"] = true,
-} end)
-
-L:RegisterTranslations("ruRU", function() return {
-    ["LFGAlerts"] = "LFG Оповещения",
-    ["LFG chat monitoring and alert options."] = "Мониторинг LFG чата и настройки оповещений.",
-    ["Filters"] = "Фильтры",
-    ["Manage your LFG alert filters."] = "Управление фильтрами оповещений LFG.",
-    ["Add Filter"] = "Добавить фильтр",
-    ["Add a new filter keyword or phrase."] = "Добавить новое ключевое слово или фразу.",
-    ["Remove Filter"] = "Удалить фильтр",
-    ["Remove a filter from the list."] = "Удалить фильтр из списка.",
-    ["Filter List"] = "Список фильтров",
-    ["Current active filters (one per line)."] = "Текущие активные фильтры (по одному на строку).",
-    ["Alert Type"] = "Тип оповещения",
-    ["Choose how to be alerted when a match is found."] = "Выберите как получать оповещения при совпадении.",
-    ["Sound Alert"] = "Звуковое оповещение",
-    ["Play a sound when filter matches."] = "Воспроизводить звук при совпадении фильтра.",
-    ["Screen Flash"] = "Мигание экрана",
-    ["Flash the screen when filter matches."] = "Мигание экрана при совпадении фильтра.",
-    ["Chat Alert"] = "Оповещение в чат",
-    ["Show alert message in default chat."] = "Показывать сообщение в основном чате.",
-    ["Case Sensitive"] = "Учитывать регистр",
-    ["Make filter matching case sensitive."] = "Учитывать регистр при поиске совпадений.",
-    ["Toggle"] = "Вкл/Выкл",
-    ["Toggle the module on and off."] = "Вкл/Выкл модуль.",
 } end)
 
 Prat_LFGAlerts = Prat:NewModule("lfgalerts")
@@ -571,7 +547,7 @@ function Prat_LFGAlerts:CreatePopupFrame()
     -- Title
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", frame, "TOP", 0, -20)
-    title:SetText("LFG Alert!")
+    title:SetText("LFM Alert!")
     title:SetTextColor(1, 1, 0)
     frame.title = title
     
@@ -630,17 +606,6 @@ function Prat_LFGAlerts:ShowPopupAlert(message, raidKey)
         end
     end)
 end
-            self.popupFrame.hideTime = GetTime() + 10
-        elseif GetTime() > self.popupFrame.hideTime then
-            self.popupFrame:Hide()
-            self.popupFrame.hideTime = nil
-            self.popupFrame:SetScript("OnUpdate", nil)
-        end
-    end)
-end
-
--- Remove the old filter management functions as they're no longer needed
--- AddFilter and RemoveFilter functions removed since we use toggles now
 
 function Prat_LFGAlerts:TestFilters()
     local message = self.db.profile.testmessage
