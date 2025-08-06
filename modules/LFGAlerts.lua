@@ -35,6 +35,8 @@ L:RegisterTranslations("enUS", function() return {
     ["Show alert message in default chat."] = true,
     ["Popup Alert"] = true,
     ["Show popup window with the matching message."] = true,
+    ["Popup Duration"] = true,
+    ["Set how long popup alerts are displayed (seconds)."] = true,
     ["Case Sensitive"] = true,
     ["Make filter matching case sensitive."] = true,
     ["Whole Words Only"] = true,
@@ -86,6 +88,7 @@ function Prat_LFGAlerts:OnInitialize()
         screenflash = true,
         chatalert = true,
         popupalert = false,
+        popupduration = 8,
         casesensitive = false,
         wholewords = false,
         testmessage = "LFM tank for MC",
@@ -251,6 +254,18 @@ function Prat_LFGAlerts:OnInitialize()
                         order = 50,
                         get = function() return self.db.profile.popupalert end,
                         set = function(v) self.db.profile.popupalert = v end,
+                    },
+                    popupduration = {
+                        name = L["Popup Duration"],
+                        desc = L["Set how long popup alerts are displayed (seconds)."],
+                        type = "range",
+                        order = 60,
+                        disabled = function() return not self.db.profile.popupalert end,
+                        min = 3,
+                        max = 20,
+                        step = 1,
+                        get = function() return self.db.profile.popupduration end,
+                        set = function(v) self.db.profile.popupduration = v end,
                     },
                 },
             },
@@ -528,49 +543,77 @@ end
 function Prat_LFGAlerts:CreatePopupFrame()
     if self.popupFrame then return end
     
+    -- Create the main popup frame (similar to Prat_PopupFrame)
     local frame = CreateFrame("Frame", "PratLFGAlertPopup", UIParent)
-    frame:SetWidth(400)
-    frame:SetHeight(150)
-    frame:SetPoint("CENTER", UIParent, "CENTER", 0, 100)
-    frame:SetFrameStrata("DIALOG")
-    frame:SetBackdrop({
-        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-        tile = true,
-        tileSize = 32,
-        edgeSize = 32,
-        insets = {left = 11, right = 12, top = 12, bottom = 11}
-    })
-    frame:SetBackdropColor(0, 0, 0, 0.8)
-    frame:SetBackdropBorderColor(1, 1, 0, 1)
+    frame:SetWidth(500)
+    frame:SetHeight(120)
+    frame:SetPoint("CENTER", UIParent, "CENTER", 0, 200)
+    frame:SetFrameStrata("FULLSCREEN_DIALOG")
+    frame:SetToplevel(true)
     
-    -- Title
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", frame, "TOP", 0, -20)
+    -- Add background texture
+    local bg = frame:CreateTexture(nil, "BACKGROUND")
+    bg:SetTexture(0, 0, 0, 0.8) -- Dark background
+    bg:SetAllPoints(frame)
+    frame.bg = bg
+    
+    -- Add border
+    local border = frame:CreateTexture(nil, "BORDER") 
+    border:SetTexture(1, 1, 0, 1) -- Yellow border
+    border:SetAllPoints(frame)
+    frame.border = border
+    
+    -- Create inner area (like popup.xml structure)
+    local innerFrame = CreateFrame("Frame", nil, frame)
+    innerFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", 2, -2)
+    innerFrame:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -2, 2)
+    
+    local innerBg = innerFrame:CreateTexture(nil, "BACKGROUND")
+    innerBg:SetTexture(0, 0, 0, 0.9)
+    innerBg:SetAllPoints(innerFrame)
+    
+    -- Title text (similar to popup.xml FontString)
+    local title = frame:CreateFontString("PratLFGAlertPopupTitle", "OVERLAY", "GameFontNormalLarge")
+    title:SetPoint("TOP", frame, "TOP", 0, -15)
     title:SetText("LFM Alert!")
-    title:SetTextColor(1, 1, 0)
+    title:SetTextColor(1, 1, 0) -- Yellow like the border
     frame.title = title
     
-    -- Message text
-    local message = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    message:SetPoint("CENTER", frame, "CENTER", 0, 10)
-    message:SetWidth(360)
+    -- Message text (main content like PopupMessage)
+    local message = frame:CreateFontString("PratLFGAlertPopupText", "OVERLAY", "GameFontNormalLarge")
+    message:SetPoint("CENTER", frame, "CENTER", 0, 5)
+    message:SetWidth(480)
     message:SetJustifyH("CENTER")
+    message:SetTextColor(1, 1, 1) -- White text
     frame.message = message
     
-    -- Close button
-    local closeBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    closeBtn:SetWidth(80)
-    closeBtn:SetHeight(22)
-    closeBtn:SetPoint("BOTTOM", frame, "BOTTOM", 0, 20)
-    closeBtn:SetText("Close")
-    closeBtn:SetScript("OnClick", function() frame:Hide() end)
+    -- Initialize fade values (like PopupMessage system)
+    frame.fadeOut = 0
+    frame:SetAlpha(1)
     
-    -- Make draggable
+    -- OnUpdate script for fading (like PopupMessage:PopupUpdated)
+    frame:SetScript("OnUpdate", function()
+        self:PopupUpdated(arg1)
+    end)
+    
+    -- Make it draggable
     frame:SetMovable(true)
     frame:EnableMouse(true)
-    frame:SetScript("OnMouseDown", function() frame:StartMoving() end)
+    frame:SetScript("OnMouseDown", function() 
+        if arg1 == "LeftButton" then
+            frame:StartMoving() 
+        end
+    end)
     frame:SetScript("OnMouseUp", function() frame:StopMovingOrSizing() end)
+    
+    -- Click to close
+    frame:SetScript("OnMouseUp", function()
+        if arg1 == "RightButton" then
+            frame:Hide()
+        else
+            frame:StopMovingOrSizing()
+        end
+    end)
     
     frame:Hide()
     self.popupFrame = frame
@@ -581,7 +624,7 @@ function Prat_LFGAlerts:ShowPopupAlert(message, raidKey)
         self:CreatePopupFrame()
     end
     
-    -- Strip color codes for cleaner display
+    -- Strip color codes for cleaner display (like PopupMessage does)
     local cleanMessage = string.gsub(message, "|c%x%x%x%x%x%x%x%x", "")
     cleanMessage = string.gsub(cleanMessage, "|r", "")
     
@@ -592,19 +635,32 @@ function Prat_LFGAlerts:ShowPopupAlert(message, raidKey)
     end
     self.popupFrame.title:SetText(title)
     
+    -- Set the message (similar to PopupMessage:AddMessage)
     self.popupFrame.message:SetText(cleanMessage)
+    
+    -- Show with fade effect (like PopupMessage system)
+    self.popupFrame.fadeOut = self.db.profile.popupduration -- Use configurable duration
+    self.popupFrame:SetAlpha(1)
     self.popupFrame:Show()
     
-    -- Auto-hide after 10 seconds
-    self.popupFrame:SetScript("OnUpdate", function()
-        if not self.popupFrame.hideTime then
-            self.popupFrame.hideTime = GetTime() + 10
-        elseif GetTime() > self.popupFrame.hideTime then
-            self.popupFrame:Hide()
-            self.popupFrame.hideTime = nil
-            self.popupFrame:SetScript("OnUpdate", nil)
-        end
-    end)
+    -- Play sound (same as PopupMessage)
+    PlaySound("FriendJoinGame")
+end
+
+-- Popup fade system (copied from PopupMessage:PopupUpdated)
+function Prat_LFGAlerts:PopupUpdated(elapsed)
+    if not self.popupFrame or not self.popupFrame:IsVisible() then
+        return
+    end
+    
+    self.popupFrame.fadeOut = self.popupFrame.fadeOut - elapsed
+    
+    if self.popupFrame.fadeOut < -1 then
+        self.popupFrame:Hide()
+    elseif self.popupFrame.fadeOut < 0 then
+        -- Fade out effect (1 second fade)
+        self.popupFrame:SetAlpha(1 + self.popupFrame.fadeOut)
+    end
 end
 
 function Prat_LFGAlerts:TestFilters()
