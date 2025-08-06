@@ -755,7 +755,7 @@ function Prat_LFGAlerts:ShowPopupAlert(message, raidKey)
         self.maxPopups = 5
     end
     
-    -- Find the first available popup slot
+    -- Find the first available popup slot (no shifting needed)
     local availableFrame = nil
     local frameIndex = nil
     
@@ -780,11 +780,39 @@ function Prat_LFGAlerts:ShowPopupAlert(message, raidKey)
         end
     end
     
-    -- If all slots are full, use the oldest one (index 1) and shift others up
+    -- If all slots are full, replace the oldest visible popup
     if not availableFrame then
-        self:ShiftPopupsUp()
-        frameIndex = self.maxPopups
-        availableFrame = self:CreatePopupFrame(frameIndex)
+        -- Find the oldest popup (one with most elapsed fade time)
+        local oldestFrame = nil
+        local oldestIndex = nil
+        local mostElapsed = -1
+        
+        for i = 1, self.maxPopups do
+            local frame = self.popupFrames[i]
+            if frame and frame:IsVisible() then
+                local elapsedTime = self.db.profile.popupduration - frame.fadeOut
+                if elapsedTime > mostElapsed then
+                    mostElapsed = elapsedTime
+                    oldestFrame = frame
+                    oldestIndex = i
+                end
+            end
+        end
+        
+        -- Use the oldest frame if found
+        if oldestFrame then
+            frameIndex = oldestIndex
+            availableFrame = oldestFrame
+            -- Reset the frame state for reuse
+            availableFrame.fadeOut = 0
+            availableFrame:SetAlpha(1)
+            availableFrame:SetScript("OnUpdate", function()
+                self:PopupUpdated(arg1, availableFrame)
+            end)
+        else
+            -- This shouldn't happen, but just in case
+            return
+        end
     end
     
     -- Apply current settings before showing
@@ -819,38 +847,8 @@ function Prat_LFGAlerts:ShowPopupAlert(message, raidKey)
     PlaySound("FriendJoinGame")
 end
 
--- Shift all popups up when queue is full
-function Prat_LFGAlerts:ShiftPopupsUp()
-    if not self.popupFrames then return end
-    
-    -- Hide and clean up the first (oldest) popup
-    if self.popupFrames[1] then
-        self.popupFrames[1]:Hide()
-        self.popupFrames[1]:SetScript("OnUpdate", nil) -- Clean up OnUpdate script
-    end
-    
-    -- Move all popups up one slot
-    for i = 1, self.maxPopups - 1 do
-        self.popupFrames[i] = self.popupFrames[i + 1]
-        if self.popupFrames[i] then
-            self.popupFrames[i].frameIndex = i
-            
-            -- Re-establish OnUpdate script with proper frame reference
-            local frame = self.popupFrames[i]
-            frame:SetScript("OnUpdate", function()
-                self:PopupUpdated(arg1, frame)
-            end)
-            
-            -- Update position for the shifted frame
-            self:UpdatePopupPosition(self.popupFrames[i], i)
-        end
-    end
-    
-    -- Clear the last slot
-    self.popupFrames[self.maxPopups] = nil
-end
 
--- Popup fade system (copied from PopupMessage:PopupUpdated)
+-- Popup fade system (simplified - no shifting/compacting)
 function Prat_LFGAlerts:PopupUpdated(elapsed, frame)
     if not frame or not frame:IsVisible() then
         return
@@ -861,44 +859,10 @@ function Prat_LFGAlerts:PopupUpdated(elapsed, frame)
     if frame.fadeOut < -1 then
         frame:Hide()
         frame:SetScript("OnUpdate", nil) -- Clean up OnUpdate script
-        -- Compact remaining popups when one disappears
-        self:CompactPopups()
+        -- Frame will be reused when a new message comes to its slot
     elseif frame.fadeOut < 0 then
         -- Fade out effect (1 second fade)
         frame:SetAlpha(1 + frame.fadeOut)
-    end
-end
-
--- Compact popups to remove gaps when one disappears
-function Prat_LFGAlerts:CompactPopups()
-    if not self.popupFrames then return end
-    
-    local visibleFrames = {}
-    
-    -- Collect all visible frames
-    for i = 1, self.maxPopups do
-        if self.popupFrames[i] and self.popupFrames[i]:IsVisible() then
-            table.insert(visibleFrames, self.popupFrames[i])
-        end
-    end
-    
-    -- Clear the array
-    for i = 1, self.maxPopups do
-        self.popupFrames[i] = nil
-    end
-    
-    -- Reassign frames to compact positions
-    for i, frame in ipairs(visibleFrames) do
-        self.popupFrames[i] = frame
-        frame.frameIndex = i
-        
-        -- Re-establish OnUpdate script with proper frame reference
-        frame:SetScript("OnUpdate", function()
-            self:PopupUpdated(arg1, frame)
-        end)
-        
-        -- Update position for compacted frame
-        self:UpdatePopupPosition(frame, i)
     end
 end
 
