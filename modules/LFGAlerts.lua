@@ -293,7 +293,6 @@ function Prat_LFGAlerts:OnInitialize()
                         get = function() return self.db.profile.popupfontsize end,
                         set = function(v) 
                             self.db.profile.popupfontsize = v
-                            self:UpdatePopupFont()
                         end,
                     },
                     popupposition = {
@@ -305,7 +304,6 @@ function Prat_LFGAlerts:OnInitialize()
                         get = function() return self.db.profile.popupposition end,
                         set = function(v) 
                             self.db.profile.popupposition = v
-                            self:UpdatePopupPosition()
                         end,
                         validate = {
                             ["CENTER"] = "Center",
@@ -329,7 +327,6 @@ function Prat_LFGAlerts:OnInitialize()
                         get = function() return self.db.profile.popupxoffset end,
                         set = function(v) 
                             self.db.profile.popupxoffset = v
-                            self:UpdatePopupPosition()
                         end,
                     },
                     popupyoffset = {
@@ -344,7 +341,6 @@ function Prat_LFGAlerts:OnInitialize()
                         get = function() return self.db.profile.popupyoffset end,
                         set = function(v) 
                             self.db.profile.popupyoffset = v
-                            self:UpdatePopupPosition()
                         end,
                     },
                 },
@@ -739,6 +735,10 @@ function Prat_LFGAlerts:ShowPopupAlert(message, raidKey)
     if not self.popupFrame then
         self:CreatePopupFrame()
     end
+    
+    -- Apply current settings before showing
+    self:UpdatePopupFont()
+    self:UpdatePopupPosition()
     
     -- Extract player name and clean message content
     local playerName, cleanMessage = self:ExtractPlayerAndMessage(message)
