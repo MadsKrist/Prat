@@ -529,7 +529,7 @@ function Prat_LFGAlerts:CheckFilters(message)
         aq40 = {"Temple of Ahn'Qiraj", "Ahn'Qiraj", "AQ 40", "AQ40"},
         bwl = {"Blackwing Lair", "Blackwing", "BWL", "BL"},
         naxx = {"Naxxramas", "Naxx40", "NAXX"},
-        kara10 = {"Karazhan 10", "Kara (10)", "KARA 10", "KARA10"},
+        kara10 = {"KARA10", "Karazhan 10", "Kara (10)", "KARA 10"},
         kara40 = {"Karazhan 40", "Kara (40)", "KARA 40", "KARA40"},
         mc = {"Molten Core", "Ragnaros", "MC"},
         es = {"Emerald Sanctum", "Emerald", "Dream", "ES"},
@@ -565,6 +565,17 @@ function Prat_LFGAlerts:CheckFilters(message)
                             "%f[%a]" .. searchKeyword .. "%f[%d%W]", -- Numbers after: ZG15, MC40
                             "%f[%d%W]" .. searchKeyword .. "%f[%W]",  -- Numbers before: 19MC, 20BWL  
                             "%f[%w]" .. searchKeyword .. "%f[%W]",    -- Standard word boundary: LFM MC
+                        }
+                        
+                        for _, pattern in ipairs(patterns) do
+                            found = string.find(searchText, pattern) ~= nil
+                            if found then break end
+                        end
+                    elseif string.match(keyword, "%d$") then
+                        -- Special handling for keywords ending with numbers (like KARA10, KARA40)
+                        local patterns = {
+                            "%f[%w]" .. searchKeyword .. "%f[%W]",    -- Standard word boundary: KARA10 Need
+                            "%f[%w]" .. searchKeyword .. "$",         -- End of string: ...KARA10
                         }
                         
                         for _, pattern in ipairs(patterns) do

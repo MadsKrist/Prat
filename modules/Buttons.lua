@@ -78,7 +78,7 @@ Prat_Buttons = Prat:NewModule("buttons")
 function Prat_Buttons:OnInitialize()
     self.db = Prat:AcquireDBNamespace("Buttons")
     Prat:RegisterDefaults("Buttons", "profile", {
-        on = true,
+        on = false,
         chatmenu = false,
         chatbutton = {false, false, false, false, false, false, false},
         showreminder = false
