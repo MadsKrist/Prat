@@ -41,6 +41,10 @@ L:RegisterTranslations("enUS", function() return {
     ["Set the font size for popup messages."] = true,
     ["Popup Position"] = true,
     ["Set the position of the popup on screen."] = true,
+    ["Popup X Offset"] = true,
+    ["Set the horizontal offset from the position anchor."] = true,
+    ["Popup Y Offset"] = true,
+    ["Set the vertical offset from the position anchor."] = true,
     ["Case Sensitive"] = true,
     ["Make filter matching case sensitive."] = true,
     ["Whole Words Only"] = true,
@@ -95,6 +99,8 @@ function Prat_LFGAlerts:OnInitialize()
         popupduration = 8,
         popupfontsize = 16,
         popupposition = "CENTER",
+        popupxoffset = 0,
+        popupyoffset = 0,
         casesensitive = false,
         wholewords = false,
         testmessage = "LFM tank for MC",
@@ -308,6 +314,36 @@ function Prat_LFGAlerts:OnInitialize()
                             ["BOTTOMLEFT"] = "Bottom Left",
                             ["BOTTOMRIGHT"] = "Bottom Right",
                         },
+                    },
+                    popupxoffset = {
+                        name = L["Popup X Offset"],
+                        desc = L["Set the horizontal offset from the position anchor."],
+                        type = "range",
+                        order = 90,
+                        disabled = function() return not self.db.profile.popupalert end,
+                        min = -500,
+                        max = 500,
+                        step = 5,
+                        get = function() return self.db.profile.popupxoffset end,
+                        set = function(v) 
+                            self.db.profile.popupxoffset = v
+                            self:UpdatePopupPosition()
+                        end,
+                    },
+                    popupyoffset = {
+                        name = L["Popup Y Offset"],
+                        desc = L["Set the vertical offset from the position anchor."],
+                        type = "range",
+                        order = 100,
+                        disabled = function() return not self.db.profile.popupalert end,
+                        min = -500,
+                        max = 500,
+                        step = 5,
+                        get = function() return self.db.profile.popupyoffset end,
+                        set = function(v) 
+                            self.db.profile.popupyoffset = v
+                            self:UpdatePopupPosition()
+                        end,
                     },
                 },
             },
@@ -598,11 +634,21 @@ function Prat_LFGAlerts:CreatePopupFrame()
     bg:SetAllPoints(frame)
     bg:SetTexture(0, 0, 0, 0.5) -- Same as popup.xml
     
-    -- Overlay text (exactly like popup.xml FontString)
+    -- Header text for raid name
+    local header = frame:CreateFontString("PratLFGAlertPopupHeader", "OVERLAY", "GameFontNormalLarge")
+    header:SetWidth(500)
+    header:SetHeight(30)
+    header:SetPoint("TOP", frame, "TOP", 0, -10)
+    header:SetJustifyH("CENTER")
+    header:SetJustifyV("TOP")
+    header:SetTextColor(1, 0.8, 0) -- Gold color for header
+    frame.header = header
+    
+    -- Message text (player name and content)
     local message = frame:CreateFontString("PratLFGAlertPopupText", "OVERLAY", "GameFontNormalLarge")
     message:SetWidth(500)
-    message:SetHeight(100)
-    message:SetPoint("CENTER", frame, "CENTER", 0, 0)
+    message:SetHeight(60)
+    message:SetPoint("CENTER", frame, "CENTER", 0, -10)
     message:SetJustifyH("CENTER")
     message:SetJustifyV("MIDDLE")
     frame.message = message
@@ -629,13 +675,23 @@ function Prat_LFGAlerts:ShowPopupAlert(message, raidKey)
         self:CreatePopupFrame()
     end
     
-    -- Format the message with raid info (like PopupMessage does with player names)
-    local displayText = message
+    -- Extract player name and clean message content
+    local playerName, cleanMessage = self:ExtractPlayerAndMessage(message)
+    
+    -- Set the header with raid name
+    local headerText = "LFG ALERT"
     if raidKey then
-        displayText = "[" .. string.upper(raidKey) .. " ALERT] " .. message
+        headerText = string.upper(raidKey) .. " GROUP"
+    end
+    self.popupFrame.header:SetText(headerText)
+    
+    -- Format the message: Player Name + Clean Message
+    local displayText = cleanMessage
+    if playerName then
+        displayText = playerName .. ": " .. cleanMessage
     end
     
-    -- Set the message (exactly like PopupMessage:AddMessage)
+    -- Set the message content
     self.popupFrame.message:SetText(displayText)
     
     -- Show with fade effect (identical to PopupMessage system)
@@ -710,18 +766,67 @@ function Prat_LFGAlerts:TestFilters()
     Prat:Print(string.format(L["Test Result: %s"], result))
 end
 
+function Prat_LFGAlerts:ExtractPlayerAndMessage(message)
+    if not message then
+        return nil, ""
+    end
+    
+    -- WoW chat messages often come in format like:
+    -- "[LookingForGroup] PlayerName: message content"
+    -- "|Hplayer:PlayerName|h[PlayerName]|h: message content"
+    -- "PlayerName: message content"
+    
+    local playerName = nil
+    local cleanMessage = message
+    
+    -- Try to extract from hyperlink format first |Hplayer:Name|h[Name]|h: message
+    local linkName, restOfMessage = string.match(message, "|Hplayer:([^|]+)|h%[([^%]]+)%]|h:%s*(.*)")
+    if linkName and restOfMessage then
+        playerName = linkName
+        cleanMessage = restOfMessage
+        return playerName, cleanMessage
+    end
+    
+    -- Try to extract from channel format [Channel] PlayerName: message
+    local channelName, name, msg = string.match(message, "^%[([^%]]+)%]%s*([^:]+):%s*(.*)")
+    if channelName and name and msg then
+        playerName = name
+        cleanMessage = msg
+        return playerName, cleanMessage
+    end
+    
+    -- Try simple format PlayerName: message
+    local name, msg = string.match(message, "^([^:]+):%s*(.*)")
+    if name and msg then
+        -- Make sure it's not a channel indicator like "[LookingForGroup]"
+        if not string.match(name, "^%[.*%]$") then
+            playerName = name
+            cleanMessage = msg
+            return playerName, cleanMessage
+        end
+    end
+    
+    -- If no pattern matches, return original message without player name
+    return nil, message
+end
+
 function Prat_LFGAlerts:UpdatePopupFont()
-    if not self.popupFrame or not self.popupFrame.message then
+    if not self.popupFrame then
         return
     end
     
     local fontSize = self.db.profile.popupfontsize
-    local fontPath, _, fontFlags = self.popupFrame.message:GetFont()
-    if not fontPath then
-        fontPath = "Fonts\\FRIZQT__.TTF" -- Default WoW font
+    local fontPath = "Fonts\\FRIZQT__.TTF" -- Default WoW font
+    
+    -- Update header font (slightly larger)
+    if self.popupFrame.header then
+        self.popupFrame.header:SetFont(fontPath, fontSize + 2, "OUTLINE")
     end
     
-    self.popupFrame.message:SetFont(fontPath, fontSize, fontFlags)
+    -- Update message font
+    if self.popupFrame.message then
+        self.popupFrame.message:SetFont(fontPath, fontSize, nil)
+    end
 end
 
 function Prat_LFGAlerts:UpdatePopupPosition()
@@ -730,27 +835,29 @@ function Prat_LFGAlerts:UpdatePopupPosition()
     end
     
     local position = self.db.profile.popupposition or "CENTER"
+    local xOffset = self.db.profile.popupxoffset or 0
+    local yOffset = self.db.profile.popupyoffset or 0
     
     -- Clear existing points
     self.popupFrame:ClearAllPoints()
     
-    -- Set new position
+    -- Set new position with user-defined offsets
     if position == "CENTER" then
-        self.popupFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+        self.popupFrame:SetPoint("CENTER", UIParent, "CENTER", xOffset, yOffset)
     elseif position == "TOP" then
-        self.popupFrame:SetPoint("TOP", UIParent, "TOP", 0, -50)
+        self.popupFrame:SetPoint("TOP", UIParent, "TOP", xOffset, yOffset - 50)
     elseif position == "BOTTOM" then
-        self.popupFrame:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 50)
+        self.popupFrame:SetPoint("BOTTOM", UIParent, "BOTTOM", xOffset, yOffset + 50)
     elseif position == "TOPLEFT" then
-        self.popupFrame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 50, -50)
+        self.popupFrame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", xOffset + 50, yOffset - 50)
     elseif position == "TOPRIGHT" then
-        self.popupFrame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -50, -50)
+        self.popupFrame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", xOffset - 50, yOffset - 50)
     elseif position == "BOTTOMLEFT" then
-        self.popupFrame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", 50, 50)
+        self.popupFrame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", xOffset + 50, yOffset + 50)
     elseif position == "BOTTOMRIGHT" then
-        self.popupFrame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", -50, 50)
+        self.popupFrame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", xOffset - 50, yOffset + 50)
     else
         -- Fallback to center
-        self.popupFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+        self.popupFrame:SetPoint("CENTER", UIParent, "CENTER", xOffset, yOffset)
     end
 end
