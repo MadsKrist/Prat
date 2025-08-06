@@ -78,7 +78,7 @@ Prat_LFGAlerts = Prat:NewModule("lfgalerts")
 function Prat_LFGAlerts:OnInitialize()
     self.db = Prat:AcquireDBNamespace("LFGAlerts")
     Prat:RegisterDefaults("LFGAlerts", "profile", {
-        on = false,
+        on = true,
         requirelfm = true,
         raids = {
             aq40 = true,
