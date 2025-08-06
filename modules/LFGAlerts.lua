@@ -109,6 +109,8 @@ function Prat_LFGAlerts:OnInitialize()
     })
     
     -- Initialize popup system (frames created on demand)
+    self.playerCooldowns = {} -- Track last popup time per player
+    self.cooldownDuration = 60 -- 1 minute cooldown
     
     -- Sound file mappings
     self.soundFiles = {
@@ -460,6 +462,11 @@ function Prat_LFGAlerts:OnDisable()
     if self.popupFrame then
         self.popupFrame:Hide()
     end
+    
+    -- Clear player cooldowns when module is disabled
+    if self.playerCooldowns then
+        self.playerCooldowns = {}
+    end
 end
 
 function Prat_LFGAlerts:FindLFGChatFrame()
@@ -617,27 +624,77 @@ function Prat_LFGAlerts:CheckFilters(message)
     return false
 end
 
+function Prat_LFGAlerts:IsPlayerOnCooldown(playerName)
+    if not playerName then
+        return false
+    end
+    
+    local currentTime = GetTime()
+    local lastAlertTime = self.playerCooldowns[playerName]
+    
+    if not lastAlertTime then
+        return false
+    end
+    
+    return (currentTime - lastAlertTime) < self.cooldownDuration
+end
+
+function Prat_LFGAlerts:SetPlayerCooldown(playerName)
+    if playerName then
+        self.playerCooldowns[playerName] = GetTime()
+        -- Clean up old entries periodically to prevent memory buildup
+        self:CleanupOldCooldowns()
+    end
+end
+
+function Prat_LFGAlerts:CleanupOldCooldowns()
+    local currentTime = GetTime()
+    local expiredPlayers = {}
+    
+    -- Find expired entries
+    for playerName, lastTime in pairs(self.playerCooldowns) do
+        if (currentTime - lastTime) > (self.cooldownDuration * 2) then -- Keep entries for 2x cooldown duration
+            table.insert(expiredPlayers, playerName)
+        end
+    end
+    
+    -- Remove expired entries
+    for _, playerName in ipairs(expiredPlayers) do
+        self.playerCooldowns[playerName] = nil
+    end
+end
+
 function Prat_LFGAlerts:TriggerAlert(message, raidKey, keyword)
-    -- Sound alert
+    -- Extract player name to check cooldown
+    local playerName, cleanMessage = self:ExtractPlayerAndMessage(message)
+    
+    -- Check if player is on cooldown for popup alerts
+    local isOnCooldown = self:IsPlayerOnCooldown(playerName)
+    
+    -- Sound alert (always play regardless of cooldown)
     if self.db.profile.soundalert then
         self:PlayAlertSound()
     end
     
-    -- Screen flash
+    -- Screen flash (always flash regardless of cooldown)
     if self.db.profile.screenflash then
         self:FlashScreen()
     end
     
-    -- Chat alert
+    -- Chat alert (always show regardless of cooldown)
     if self.db.profile.chatalert then
         local raidName = string.upper(raidKey or "UNKNOWN")
         local alertMsg = string.format("LFM Alert [%s]: %s", raidName, message)
         DEFAULT_CHAT_FRAME:AddMessage(alertMsg, 1, 1, 0) -- Yellow text
     end
     
-    -- Popup alert
+    -- Popup alert (only show if player is not on cooldown)
     if self.db.profile.popupalert then
-        self:ShowPopupAlert(message, raidKey)
+        if not isOnCooldown then
+            self:ShowPopupAlert(message, raidKey)
+            -- Set cooldown for this player
+            self:SetPlayerCooldown(playerName)
+        end
     end
 end
 
