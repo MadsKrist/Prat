@@ -543,76 +543,35 @@ end
 function Prat_LFGAlerts:CreatePopupFrame()
     if self.popupFrame then return end
     
-    -- Create the main popup frame (similar to Prat_PopupFrame)
+    -- Create the main popup frame exactly like popup.xml
     local frame = CreateFrame("Frame", "PratLFGAlertPopup", UIParent)
-    frame:SetWidth(500)
-    frame:SetHeight(120)
-    frame:SetPoint("CENTER", UIParent, "CENTER", 0, 200)
+    frame:SetWidth(505)
+    frame:SetHeight(95)
+    frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     frame:SetFrameStrata("FULLSCREEN_DIALOG")
     frame:SetToplevel(true)
     
-    -- Add background texture
-    local bg = frame:CreateTexture(nil, "BACKGROUND")
-    bg:SetTexture(0, 0, 0, 0.8) -- Dark background
+    -- Background layer (like popup.xml)
+    local bg = frame:CreateTexture("PratLFGAlertPopupBG", "BACKGROUND")
     bg:SetAllPoints(frame)
-    frame.bg = bg
+    bg:SetTexture(0, 0, 0, 0.5) -- Same as popup.xml
     
-    -- Add border
-    local border = frame:CreateTexture(nil, "BORDER") 
-    border:SetTexture(1, 1, 0, 1) -- Yellow border
-    border:SetAllPoints(frame)
-    frame.border = border
-    
-    -- Create inner area (like popup.xml structure)
-    local innerFrame = CreateFrame("Frame", nil, frame)
-    innerFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", 2, -2)
-    innerFrame:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -2, 2)
-    
-    local innerBg = innerFrame:CreateTexture(nil, "BACKGROUND")
-    innerBg:SetTexture(0, 0, 0, 0.9)
-    innerBg:SetAllPoints(innerFrame)
-    
-    -- Title text (similar to popup.xml FontString)
-    local title = frame:CreateFontString("PratLFGAlertPopupTitle", "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", frame, "TOP", 0, -15)
-    title:SetText("LFM Alert!")
-    title:SetTextColor(1, 1, 0) -- Yellow like the border
-    frame.title = title
-    
-    -- Message text (main content like PopupMessage)
+    -- Overlay text (exactly like popup.xml FontString)
     local message = frame:CreateFontString("PratLFGAlertPopupText", "OVERLAY", "GameFontNormalLarge")
-    message:SetPoint("CENTER", frame, "CENTER", 0, 5)
-    message:SetWidth(480)
+    message:SetWidth(500)
+    message:SetHeight(100)
+    message:SetPoint("CENTER", frame, "CENTER", 0, 0)
     message:SetJustifyH("CENTER")
-    message:SetTextColor(1, 1, 1) -- White text
+    message:SetJustifyV("MIDDLE")
     frame.message = message
     
     -- Initialize fade values (like PopupMessage system)
     frame.fadeOut = 0
     frame:SetAlpha(1)
     
-    -- OnUpdate script for fading (like PopupMessage:PopupUpdated)
+    -- OnUpdate script for fading (exactly like popup.xml)
     frame:SetScript("OnUpdate", function()
         self:PopupUpdated(arg1)
-    end)
-    
-    -- Make it draggable
-    frame:SetMovable(true)
-    frame:EnableMouse(true)
-    frame:SetScript("OnMouseDown", function() 
-        if arg1 == "LeftButton" then
-            frame:StartMoving() 
-        end
-    end)
-    frame:SetScript("OnMouseUp", function() frame:StopMovingOrSizing() end)
-    
-    -- Click to close
-    frame:SetScript("OnMouseUp", function()
-        if arg1 == "RightButton" then
-            frame:Hide()
-        else
-            frame:StopMovingOrSizing()
-        end
     end)
     
     frame:Hide()
@@ -624,22 +583,17 @@ function Prat_LFGAlerts:ShowPopupAlert(message, raidKey)
         self:CreatePopupFrame()
     end
     
-    -- Strip color codes for cleaner display (like PopupMessage does)
-    local cleanMessage = string.gsub(message, "|c%x%x%x%x%x%x%x%x", "")
-    cleanMessage = string.gsub(cleanMessage, "|r", "")
-    
-    -- Update title with raid info
-    local title = "LFM Alert!"
+    -- Format the message with raid info (like PopupMessage does with player names)
+    local displayText = message
     if raidKey then
-        title = title .. " [" .. string.upper(raidKey) .. "]"
+        displayText = "[" .. string.upper(raidKey) .. " ALERT] " .. message
     end
-    self.popupFrame.title:SetText(title)
     
-    -- Set the message (similar to PopupMessage:AddMessage)
-    self.popupFrame.message:SetText(cleanMessage)
+    -- Set the message (exactly like PopupMessage:AddMessage)
+    self.popupFrame.message:SetText(displayText)
     
-    -- Show with fade effect (like PopupMessage system)
-    self.popupFrame.fadeOut = self.db.profile.popupduration -- Use configurable duration
+    -- Show with fade effect (identical to PopupMessage system)
+    self.popupFrame.fadeOut = self.db.profile.popupduration
     self.popupFrame:SetAlpha(1)
     self.popupFrame:Show()
     
