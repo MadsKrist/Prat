@@ -739,7 +739,7 @@ function Prat_LFGAlerts:CreatePopupFrame(frameIndex)
     
     -- OnUpdate script for fading (exactly like popup.xml)
     frame:SetScript("OnUpdate", function()
-        self:PopupUpdated(arg1, frameIndex)
+        self:PopupUpdated(arg1, frame)
     end)
     
     frame:Hide()
@@ -761,9 +761,21 @@ function Prat_LFGAlerts:ShowPopupAlert(message, raidKey)
     
     for i = 1, self.maxPopups do
         local frame = self.popupFrames[i]
-        if not frame or not frame:IsVisible() then
+        if not frame then
+            -- No frame exists at this slot, create a new one
             frameIndex = i
             availableFrame = self:CreatePopupFrame(i)
+            break
+        elseif not frame:IsVisible() then
+            -- Frame exists but is hidden, reuse it
+            frameIndex = i
+            availableFrame = frame
+            -- Reset the frame state for reuse
+            availableFrame.fadeOut = 0
+            availableFrame:SetAlpha(1)
+            availableFrame:SetScript("OnUpdate", function()
+                self:PopupUpdated(arg1, availableFrame)
+            end)
             break
         end
     end
@@ -811,9 +823,10 @@ end
 function Prat_LFGAlerts:ShiftPopupsUp()
     if not self.popupFrames then return end
     
-    -- Hide the first (oldest) popup
+    -- Hide and clean up the first (oldest) popup
     if self.popupFrames[1] then
         self.popupFrames[1]:Hide()
+        self.popupFrames[1]:SetScript("OnUpdate", nil) -- Clean up OnUpdate script
     end
     
     -- Move all popups up one slot
@@ -821,6 +834,13 @@ function Prat_LFGAlerts:ShiftPopupsUp()
         self.popupFrames[i] = self.popupFrames[i + 1]
         if self.popupFrames[i] then
             self.popupFrames[i].frameIndex = i
+            
+            -- Re-establish OnUpdate script with proper frame reference
+            local frame = self.popupFrames[i]
+            frame:SetScript("OnUpdate", function()
+                self:PopupUpdated(arg1, frame)
+            end)
+            
             -- Update position for the shifted frame
             self:UpdatePopupPosition(self.popupFrames[i], i)
         end
@@ -831,18 +851,16 @@ function Prat_LFGAlerts:ShiftPopupsUp()
 end
 
 -- Popup fade system (copied from PopupMessage:PopupUpdated)
-function Prat_LFGAlerts:PopupUpdated(elapsed, frameIndex)
-    frameIndex = frameIndex or 1
-    
-    if not self.popupFrames or not self.popupFrames[frameIndex] or not self.popupFrames[frameIndex]:IsVisible() then
+function Prat_LFGAlerts:PopupUpdated(elapsed, frame)
+    if not frame or not frame:IsVisible() then
         return
     end
     
-    local frame = self.popupFrames[frameIndex]
     frame.fadeOut = frame.fadeOut - elapsed
     
     if frame.fadeOut < -1 then
         frame:Hide()
+        frame:SetScript("OnUpdate", nil) -- Clean up OnUpdate script
         -- Compact remaining popups when one disappears
         self:CompactPopups()
     elseif frame.fadeOut < 0 then
@@ -873,6 +891,12 @@ function Prat_LFGAlerts:CompactPopups()
     for i, frame in ipairs(visibleFrames) do
         self.popupFrames[i] = frame
         frame.frameIndex = i
+        
+        -- Re-establish OnUpdate script with proper frame reference
+        frame:SetScript("OnUpdate", function()
+            self:PopupUpdated(arg1, frame)
+        end)
+        
         -- Update position for compacted frame
         self:UpdatePopupPosition(frame, i)
     end
