@@ -780,9 +780,9 @@ function Prat_LFGAlerts:ExtractPlayerAndMessage(message)
     local cleanMessage = message
     
     -- Try to extract from hyperlink format first |Hplayer:Name|h[Name]|h: message
-    local linkName, restOfMessage = string.match(message, "|Hplayer:([^|]+)|h%[([^%]]+)%]|h:%s*(.*)")
-    if linkName and restOfMessage then
-        playerName = linkName
+    local linkName, displayName, restOfMessage = string.match(message, "|Hplayer:([^|]+)|h%[([^%]]+)%]|h:%s*(.*)")
+    if linkName and displayName and restOfMessage then
+        playerName = displayName
         cleanMessage = restOfMessage
         return playerName, cleanMessage
     end
