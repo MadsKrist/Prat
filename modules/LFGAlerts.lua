@@ -566,7 +566,7 @@ function Prat_LFGAlerts:CheckFilters(message)
                         raidKey = raidKey,
                         keyword = keyword,
                         keywordLength = string.len(keyword),
-                        priority = #keywords - (#matches) + proximityBonus, -- Earlier in list = higher priority
+                        priority = table.getn(keywords) - table.getn(matches) + proximityBonus, -- Earlier in list = higher priority
                         proximityBonus = proximityBonus
                     })
                 end
