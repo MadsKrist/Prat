@@ -37,6 +37,10 @@ L:RegisterTranslations("enUS", function() return {
     ["Show popup window with the matching message."] = true,
     ["Popup Duration"] = true,
     ["Set how long popup alerts are displayed (seconds)."] = true,
+    ["Popup Font Size"] = true,
+    ["Set the font size for popup messages."] = true,
+    ["Popup Position"] = true,
+    ["Set the position of the popup on screen."] = true,
     ["Case Sensitive"] = true,
     ["Make filter matching case sensitive."] = true,
     ["Whole Words Only"] = true,
@@ -89,6 +93,8 @@ function Prat_LFGAlerts:OnInitialize()
         chatalert = true,
         popupalert = false,
         popupduration = 8,
+        popupfontsize = 16,
+        popupposition = "CENTER",
         casesensitive = false,
         wholewords = false,
         testmessage = "LFM tank for MC",
@@ -266,6 +272,42 @@ function Prat_LFGAlerts:OnInitialize()
                         step = 1,
                         get = function() return self.db.profile.popupduration end,
                         set = function(v) self.db.profile.popupduration = v end,
+                    },
+                    popupfontsize = {
+                        name = L["Popup Font Size"],
+                        desc = L["Set the font size for popup messages."],
+                        type = "range",
+                        order = 70,
+                        disabled = function() return not self.db.profile.popupalert end,
+                        min = 8,
+                        max = 32,
+                        step = 1,
+                        get = function() return self.db.profile.popupfontsize end,
+                        set = function(v) 
+                            self.db.profile.popupfontsize = v
+                            self:UpdatePopupFont()
+                        end,
+                    },
+                    popupposition = {
+                        name = L["Popup Position"],
+                        desc = L["Set the position of the popup on screen."],
+                        type = "text",
+                        order = 80,
+                        disabled = function() return not self.db.profile.popupalert end,
+                        get = function() return self.db.profile.popupposition end,
+                        set = function(v) 
+                            self.db.profile.popupposition = v
+                            self:UpdatePopupPosition()
+                        end,
+                        validate = {
+                            ["CENTER"] = "Center",
+                            ["TOP"] = "Top",
+                            ["BOTTOM"] = "Bottom",
+                            ["TOPLEFT"] = "Top Left",
+                            ["TOPRIGHT"] = "Top Right",
+                            ["BOTTOMLEFT"] = "Bottom Left",
+                            ["BOTTOMRIGHT"] = "Bottom Right",
+                        },
                     },
                 },
             },
@@ -565,6 +607,10 @@ function Prat_LFGAlerts:CreatePopupFrame()
     message:SetJustifyV("MIDDLE")
     frame.message = message
     
+    -- Apply initial font size and position
+    self:UpdatePopupFont()
+    self:UpdatePopupPosition()
+    
     -- Initialize fade values (like PopupMessage system)
     frame.fadeOut = 0
     frame:SetAlpha(1)
@@ -662,4 +708,49 @@ function Prat_LFGAlerts:TestFilters()
     end
     
     Prat:Print(string.format(L["Test Result: %s"], result))
+end
+
+function Prat_LFGAlerts:UpdatePopupFont()
+    if not self.popupFrame or not self.popupFrame.message then
+        return
+    end
+    
+    local fontSize = self.db.profile.popupfontsize
+    local fontPath, _, fontFlags = self.popupFrame.message:GetFont()
+    if not fontPath then
+        fontPath = "Fonts\\FRIZQT__.TTF" -- Default WoW font
+    end
+    
+    self.popupFrame.message:SetFont(fontPath, fontSize, fontFlags)
+end
+
+function Prat_LFGAlerts:UpdatePopupPosition()
+    if not self.popupFrame then
+        return
+    end
+    
+    local position = self.db.profile.popupposition or "CENTER"
+    
+    -- Clear existing points
+    self.popupFrame:ClearAllPoints()
+    
+    -- Set new position
+    if position == "CENTER" then
+        self.popupFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+    elseif position == "TOP" then
+        self.popupFrame:SetPoint("TOP", UIParent, "TOP", 0, -50)
+    elseif position == "BOTTOM" then
+        self.popupFrame:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 50)
+    elseif position == "TOPLEFT" then
+        self.popupFrame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 50, -50)
+    elseif position == "TOPRIGHT" then
+        self.popupFrame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -50, -50)
+    elseif position == "BOTTOMLEFT" then
+        self.popupFrame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", 50, 50)
+    elseif position == "BOTTOMRIGHT" then
+        self.popupFrame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", -50, 50)
+    else
+        -- Fallback to center
+        self.popupFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+    end
 end
