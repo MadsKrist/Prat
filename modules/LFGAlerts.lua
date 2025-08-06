@@ -507,17 +507,21 @@ function Prat_LFGAlerts:CheckFilters(message)
     end
     
     -- Second check: Must match at least one enabled raid
+    -- Define keywords with priority (longer/more specific first)
     local raidKeywords = {
-        aq40 = {"AQ40", "AQ 40", "Ahn'Qiraj", "Temple of Ahn'Qiraj"},
-        bwl = {"BWL", "Blackwing Lair", "Blackwing", "BL"},
-        naxx = {"NAXX", "Naxxramas", "Naxx40"},
-        kara10 = {"KARA 10", "KARA10", "Karazhan 10", "Kara (10)"},
-        kara40 = {"KARA 40", "KARA40", "Karazhan 40", "Kara (40)"},
-        mc = {"MC", "Molten Core", "Molten", "Ragnaros"},
-        es = {"ES", "Emerald Sanctum", "Emerald", "Dream"},
-        ony = {"ONY", "Onyxia", "Onyxia's Lair"},
-        zg = {"ZG", "Zul'Gurub", "Zul Gurub", "Gurub"},
+        aq40 = {"Temple of Ahn'Qiraj", "Ahn'Qiraj", "AQ 40", "AQ40"},
+        bwl = {"Blackwing Lair", "Blackwing", "BWL", "BL"},
+        naxx = {"Naxxramas", "Naxx40", "NAXX"},
+        kara10 = {"Karazhan 10", "Kara (10)", "KARA 10", "KARA10"},
+        kara40 = {"Karazhan 40", "Kara (40)", "KARA 40", "KARA40"},
+        mc = {"Molten Core", "Ragnaros", "MC"},
+        es = {"Emerald Sanctum", "Emerald", "Dream", "ES"},
+        ony = {"Onyxia's Lair", "Onyxia", "ONY"},
+        zg = {"Zul'Gurub", "Zul Gurub", "Gurub", "ZG"},
     }
+    
+    -- Track all matches to find the best one
+    local matches = {}
     
     for raidKey, keywords in pairs(raidKeywords) do
         if self.db.profile.raids[raidKey] then
@@ -528,7 +532,14 @@ function Prat_LFGAlerts:CheckFilters(message)
                 end
                 
                 local found = false
-                if self.db.profile.wholewords then
+                local useWholeWords = self.db.profile.wholewords
+                
+                -- Force whole word matching for short ambiguous keywords
+                if string.len(keyword) <= 2 then
+                    useWholeWords = true
+                end
+                
+                if useWholeWords then
                     -- Match whole words only
                     local pattern = "%f[%w]" .. searchKeyword .. "%f[%W]"
                     found = string.find(searchText, pattern) ~= nil
@@ -538,10 +549,43 @@ function Prat_LFGAlerts:CheckFilters(message)
                 end
                 
                 if found then
-                    return true, raidKey, keyword
+                    -- Check if keyword appears right after LFM for higher priority
+                    local proximityBonus = 0
+                    local lfmPattern = self.db.profile.casesensitive and "LFM%s+" or "lfm%s+"
+                    local afterLfmPattern = lfmPattern .. searchKeyword
+                    if string.find(searchText, afterLfmPattern) then
+                        proximityBonus = 1000 -- High bonus for keywords right after LFM
+                    end
+                    
+                    table.insert(matches, {
+                        raidKey = raidKey,
+                        keyword = keyword,
+                        keywordLength = string.len(keyword),
+                        priority = #keywords - (#matches) + proximityBonus, -- Earlier in list = higher priority
+                        proximityBonus = proximityBonus
+                    })
                 end
             end
         end
+    end
+    
+    -- Return the best match (proximity to LFM first, then longest keyword, then priority)
+    if table.getn(matches) > 0 then
+        table.sort(matches, function(a, b)
+            -- Proximity to LFM is highest priority
+            if a.proximityBonus ~= b.proximityBonus then
+                return a.proximityBonus > b.proximityBonus
+            end
+            -- Then longer keywords
+            if a.keywordLength ~= b.keywordLength then
+                return a.keywordLength > b.keywordLength
+            end
+            -- Then original priority
+            return a.priority > b.priority
+        end)
+        
+        local bestMatch = matches[1]
+        return true, bestMatch.raidKey, bestMatch.keyword
     end
     
     return false
