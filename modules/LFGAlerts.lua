@@ -545,9 +545,25 @@ function Prat_LFGAlerts:CheckFilters(message)
                 end
                 
                 if useWholeWords then
-                    -- Match whole words only
-                    local pattern = "%f[%w]" .. searchKeyword .. "%f[%W]"
-                    found = string.find(searchText, pattern) ~= nil
+                    -- Match whole words only - handle numbers properly
+                    -- For very short keywords like MC, ES, etc, be more flexible with numbers
+                    if string.len(keyword) <= 3 then
+                        -- Try multiple patterns for short raid keywords
+                        local patterns = {
+                            "%f[%a]" .. searchKeyword .. "%f[%d%W]", -- Numbers after: ZG15, MC40
+                            "%f[%d%W]" .. searchKeyword .. "%f[%W]",  -- Numbers before: 19MC, 20BWL  
+                            "%f[%w]" .. searchKeyword .. "%f[%W]",    -- Standard word boundary: LFM MC
+                        }
+                        
+                        for _, pattern in ipairs(patterns) do
+                            found = string.find(searchText, pattern) ~= nil
+                            if found then break end
+                        end
+                    else
+                        -- Standard word boundary for longer keywords
+                        local pattern = "%f[%w]" .. searchKeyword .. "%f[%W]"
+                        found = string.find(searchText, pattern) ~= nil
+                    end
                 else
                     -- Match anywhere in text
                     found = string.find(searchText, searchKeyword, 1, true) ~= nil
