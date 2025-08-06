@@ -737,6 +737,27 @@ function Prat_LFGAlerts:CreatePopupFrame(frameIndex)
     frame.fadeOut = 0
     frame:SetAlpha(1)
     
+    -- Make frame clickable with hover effects
+    frame:EnableMouse(true)
+    frame:SetScript("OnMouseDown", function()
+        self:OnPopupClick(frame)
+    end)
+    
+    -- Add hover effects to show it's clickable
+    frame:SetScript("OnEnter", function()
+        if frame.playerName then
+            frame:SetAlpha(0.8)
+            GameTooltip:SetOwner(frame, "ANCHOR_TOP")
+            GameTooltip:SetText("Click to whisper " .. frame.playerName, 1, 1, 1)
+            GameTooltip:Show()
+        end
+    end)
+    
+    frame:SetScript("OnLeave", function()
+        frame:SetAlpha(1)
+        GameTooltip:Hide()
+    end)
+    
     -- OnUpdate script for fading (exactly like popup.xml)
     frame:SetScript("OnUpdate", function()
         self:PopupUpdated(arg1, frame)
@@ -776,6 +797,8 @@ function Prat_LFGAlerts:ShowPopupAlert(message, raidKey)
             availableFrame:SetScript("OnUpdate", function()
                 self:PopupUpdated(arg1, availableFrame)
             end)
+            -- Hide any leftover tooltip
+            GameTooltip:Hide()
             break
         end
     end
@@ -809,6 +832,8 @@ function Prat_LFGAlerts:ShowPopupAlert(message, raidKey)
             availableFrame:SetScript("OnUpdate", function()
                 self:PopupUpdated(arg1, availableFrame)
             end)
+            -- Hide any leftover tooltip
+            GameTooltip:Hide()
         else
             -- This shouldn't happen, but just in case
             return
@@ -838,6 +863,9 @@ function Prat_LFGAlerts:ShowPopupAlert(message, raidKey)
     -- Set the message content
     availableFrame.message:SetText(displayText)
     
+    -- Store player name for whisper functionality
+    availableFrame.playerName = playerName
+    
     -- Show with fade effect (identical to PopupMessage system)
     availableFrame.fadeOut = self.db.profile.popupduration
     availableFrame:SetAlpha(1)
@@ -847,6 +875,34 @@ function Prat_LFGAlerts:ShowPopupAlert(message, raidKey)
     PlaySound("FriendJoinGame")
 end
 
+
+-- Handle popup click events
+function Prat_LFGAlerts:OnPopupClick(frame)
+    if not frame or not frame.playerName then
+        return
+    end
+    
+    local playerName = frame.playerName
+    
+    -- Hide the popup immediately when clicked
+    frame:Hide()
+    frame:SetScript("OnUpdate", nil)
+    
+    -- Set up whisper target and focus the chat edit box
+    local editBox = DEFAULT_CHAT_FRAME.editBox
+    if editBox then
+        -- Set the whisper command
+        editBox:SetText("/w " .. playerName .. " ")
+        editBox:Show()
+        editBox:SetFocus()
+        -- Position cursor at the end
+        editBox:HighlightText(0, 0)
+        editBox:SetCursorPosition(string.len("/w " .. playerName .. " "))
+    end
+    
+    -- Provide user feedback
+    DEFAULT_CHAT_FRAME:AddMessage("Whispering " .. playerName .. "...", 0, 1, 0) -- Green text
+end
 
 -- Popup fade system (simplified - no shifting/compacting)
 function Prat_LFGAlerts:PopupUpdated(elapsed, frame)
