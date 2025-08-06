@@ -108,8 +108,7 @@ function Prat_LFGAlerts:OnInitialize()
         testmessage = "LFM tank for MC",
     })
     
-    -- Create popup frame for alerts
-    self:CreatePopupFrame()
+    -- Initialize popup system (frames created on demand)
     
     -- Sound file mappings
     self.soundFiles = {
@@ -448,6 +447,16 @@ function Prat_LFGAlerts:OnDisable()
         end
     end
     
+    -- Hide all popup frames
+    if self.popupFrames then
+        for i = 1, self.maxPopups or 5 do
+            if self.popupFrames[i] then
+                self.popupFrames[i]:Hide()
+            end
+        end
+    end
+    
+    -- Legacy support for old single popup frame
     if self.popupFrame then
         self.popupFrame:Hide()
     end
@@ -679,24 +688,31 @@ function Prat_LFGAlerts:FlashScreen()
     end)
 end
 
-function Prat_LFGAlerts:CreatePopupFrame()
-    if self.popupFrame then return end
+function Prat_LFGAlerts:CreatePopupFrame(frameIndex)
+    frameIndex = frameIndex or 1
     
-    -- Create the main popup frame exactly like popup.xml
-    local frame = CreateFrame("Frame", "PratLFGAlertPopup", UIParent)
+    -- Initialize popup frames table
+    if not self.popupFrames then
+        self.popupFrames = {}
+        self.maxPopups = 5
+    end
+    
+    if self.popupFrames[frameIndex] then return self.popupFrames[frameIndex] end
+    
+    -- Create the popup frame exactly like popup.xml
+    local frame = CreateFrame("Frame", "PratLFGAlertPopup" .. frameIndex, UIParent)
     frame:SetWidth(505)
     frame:SetHeight(95)
-    frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     frame:SetFrameStrata("FULLSCREEN_DIALOG")
     frame:SetToplevel(true)
     
     -- Background layer (like popup.xml)
-    local bg = frame:CreateTexture("PratLFGAlertPopupBG", "BACKGROUND")
+    local bg = frame:CreateTexture("PratLFGAlertPopupBG" .. frameIndex, "BACKGROUND")
     bg:SetAllPoints(frame)
     bg:SetTexture(0, 0, 0, 0.5) -- Same as popup.xml
     
     -- Header text for raid name
-    local header = frame:CreateFontString("PratLFGAlertPopupHeader", "OVERLAY", "GameFontNormalLarge")
+    local header = frame:CreateFontString("PratLFGAlertPopupHeader" .. frameIndex, "OVERLAY", "GameFontNormalLarge")
     header:SetWidth(500)
     header:SetHeight(30)
     header:SetPoint("TOP", frame, "TOP", 0, -10)
@@ -706,7 +722,7 @@ function Prat_LFGAlerts:CreatePopupFrame()
     frame.header = header
     
     -- Message text (player name and content)
-    local message = frame:CreateFontString("PratLFGAlertPopupText", "OVERLAY", "GameFontNormalLarge")
+    local message = frame:CreateFontString("PratLFGAlertPopupText" .. frameIndex, "OVERLAY", "GameFontNormalLarge")
     message:SetWidth(500)
     message:SetHeight(60)
     message:SetPoint("CENTER", frame, "CENTER", 0, -10)
@@ -714,9 +730,8 @@ function Prat_LFGAlerts:CreatePopupFrame()
     message:SetJustifyV("MIDDLE")
     frame.message = message
     
-    -- Apply initial font size and position
-    self:UpdatePopupFont()
-    self:UpdatePopupPosition()
+    -- Store frame index for positioning
+    frame.frameIndex = frameIndex
     
     -- Initialize fade values (like PopupMessage system)
     frame.fadeOut = 0
@@ -724,21 +739,45 @@ function Prat_LFGAlerts:CreatePopupFrame()
     
     -- OnUpdate script for fading (exactly like popup.xml)
     frame:SetScript("OnUpdate", function()
-        self:PopupUpdated(arg1)
+        self:PopupUpdated(arg1, frameIndex)
     end)
     
     frame:Hide()
-    self.popupFrame = frame
+    self.popupFrames[frameIndex] = frame
+    
+    return frame
 end
 
 function Prat_LFGAlerts:ShowPopupAlert(message, raidKey)
-    if not self.popupFrame then
-        self:CreatePopupFrame()
+    -- Initialize popup system
+    if not self.popupFrames then
+        self.popupFrames = {}
+        self.maxPopups = 5
+    end
+    
+    -- Find the first available popup slot
+    local availableFrame = nil
+    local frameIndex = nil
+    
+    for i = 1, self.maxPopups do
+        local frame = self.popupFrames[i]
+        if not frame or not frame:IsVisible() then
+            frameIndex = i
+            availableFrame = self:CreatePopupFrame(i)
+            break
+        end
+    end
+    
+    -- If all slots are full, use the oldest one (index 1) and shift others up
+    if not availableFrame then
+        self:ShiftPopupsUp()
+        frameIndex = self.maxPopups
+        availableFrame = self:CreatePopupFrame(frameIndex)
     end
     
     -- Apply current settings before showing
-    self:UpdatePopupFont()
-    self:UpdatePopupPosition()
+    self:UpdatePopupFont(availableFrame)
+    self:UpdatePopupPosition(availableFrame, frameIndex)
     
     -- Extract player name and clean message content
     local playerName, cleanMessage = self:ExtractPlayerAndMessage(message)
@@ -748,7 +787,7 @@ function Prat_LFGAlerts:ShowPopupAlert(message, raidKey)
     if raidKey then
         headerText = string.upper(raidKey) .. " GROUP"
     end
-    self.popupFrame.header:SetText(headerText)
+    availableFrame.header:SetText(headerText)
     
     -- Format the message: Player Name + Clean Message
     local displayText = cleanMessage
@@ -757,30 +796,85 @@ function Prat_LFGAlerts:ShowPopupAlert(message, raidKey)
     end
     
     -- Set the message content
-    self.popupFrame.message:SetText(displayText)
+    availableFrame.message:SetText(displayText)
     
     -- Show with fade effect (identical to PopupMessage system)
-    self.popupFrame.fadeOut = self.db.profile.popupduration
-    self.popupFrame:SetAlpha(1)
-    self.popupFrame:Show()
+    availableFrame.fadeOut = self.db.profile.popupduration
+    availableFrame:SetAlpha(1)
+    availableFrame:Show()
     
     -- Play sound (same as PopupMessage)
     PlaySound("FriendJoinGame")
 end
 
+-- Shift all popups up when queue is full
+function Prat_LFGAlerts:ShiftPopupsUp()
+    if not self.popupFrames then return end
+    
+    -- Hide the first (oldest) popup
+    if self.popupFrames[1] then
+        self.popupFrames[1]:Hide()
+    end
+    
+    -- Move all popups up one slot
+    for i = 1, self.maxPopups - 1 do
+        self.popupFrames[i] = self.popupFrames[i + 1]
+        if self.popupFrames[i] then
+            self.popupFrames[i].frameIndex = i
+            -- Update position for the shifted frame
+            self:UpdatePopupPosition(self.popupFrames[i], i)
+        end
+    end
+    
+    -- Clear the last slot
+    self.popupFrames[self.maxPopups] = nil
+end
+
 -- Popup fade system (copied from PopupMessage:PopupUpdated)
-function Prat_LFGAlerts:PopupUpdated(elapsed)
-    if not self.popupFrame or not self.popupFrame:IsVisible() then
+function Prat_LFGAlerts:PopupUpdated(elapsed, frameIndex)
+    frameIndex = frameIndex or 1
+    
+    if not self.popupFrames or not self.popupFrames[frameIndex] or not self.popupFrames[frameIndex]:IsVisible() then
         return
     end
     
-    self.popupFrame.fadeOut = self.popupFrame.fadeOut - elapsed
+    local frame = self.popupFrames[frameIndex]
+    frame.fadeOut = frame.fadeOut - elapsed
     
-    if self.popupFrame.fadeOut < -1 then
-        self.popupFrame:Hide()
-    elseif self.popupFrame.fadeOut < 0 then
+    if frame.fadeOut < -1 then
+        frame:Hide()
+        -- Compact remaining popups when one disappears
+        self:CompactPopups()
+    elseif frame.fadeOut < 0 then
         -- Fade out effect (1 second fade)
-        self.popupFrame:SetAlpha(1 + self.popupFrame.fadeOut)
+        frame:SetAlpha(1 + frame.fadeOut)
+    end
+end
+
+-- Compact popups to remove gaps when one disappears
+function Prat_LFGAlerts:CompactPopups()
+    if not self.popupFrames then return end
+    
+    local visibleFrames = {}
+    
+    -- Collect all visible frames
+    for i = 1, self.maxPopups do
+        if self.popupFrames[i] and self.popupFrames[i]:IsVisible() then
+            table.insert(visibleFrames, self.popupFrames[i])
+        end
+    end
+    
+    -- Clear the array
+    for i = 1, self.maxPopups do
+        self.popupFrames[i] = nil
+    end
+    
+    -- Reassign frames to compact positions
+    for i, frame in ipairs(visibleFrames) do
+        self.popupFrames[i] = frame
+        frame.frameIndex = i
+        -- Update position for compacted frame
+        self:UpdatePopupPosition(frame, i)
     end
 end
 
@@ -875,8 +969,15 @@ function Prat_LFGAlerts:ExtractPlayerAndMessage(message)
     return nil, message
 end
 
-function Prat_LFGAlerts:UpdatePopupFont()
-    if not self.popupFrame then
+function Prat_LFGAlerts:UpdatePopupFont(frame)
+    -- If no specific frame provided, update all frames
+    if not frame then
+        if not self.popupFrames then return end
+        for i = 1, self.maxPopups do
+            if self.popupFrames[i] then
+                self:UpdatePopupFont(self.popupFrames[i])
+            end
+        end
         return
     end
     
@@ -884,45 +985,57 @@ function Prat_LFGAlerts:UpdatePopupFont()
     local fontPath = "Fonts\\FRIZQT__.TTF" -- Default WoW font
     
     -- Update header font (slightly larger)
-    if self.popupFrame.header then
-        self.popupFrame.header:SetFont(fontPath, fontSize + 2, "OUTLINE")
+    if frame.header then
+        frame.header:SetFont(fontPath, fontSize + 2, "OUTLINE")
     end
     
     -- Update message font
-    if self.popupFrame.message then
-        self.popupFrame.message:SetFont(fontPath, fontSize, nil)
+    if frame.message then
+        frame.message:SetFont(fontPath, fontSize, nil)
     end
 end
 
-function Prat_LFGAlerts:UpdatePopupPosition()
-    if not self.popupFrame then
+function Prat_LFGAlerts:UpdatePopupPosition(frame, frameIndex)
+    -- If no specific frame provided, update all frames
+    if not frame then
+        if not self.popupFrames then return end
+        for i = 1, self.maxPopups do
+            if self.popupFrames[i] then
+                self:UpdatePopupPosition(self.popupFrames[i], i)
+            end
+        end
         return
     end
+    
+    frameIndex = frameIndex or frame.frameIndex or 1
     
     local position = self.db.profile.popupposition or "CENTER"
     local xOffset = self.db.profile.popupxoffset or 0
     local yOffset = self.db.profile.popupyoffset or 0
     
-    -- Clear existing points
-    self.popupFrame:ClearAllPoints()
+    -- Calculate stacking offset (each popup is 110 units below the previous one)
+    local stackOffset = (frameIndex - 1) * 110
     
-    -- Set new position with user-defined offsets
+    -- Clear existing points
+    frame:ClearAllPoints()
+    
+    -- Set new position with user-defined offsets and stacking
     if position == "CENTER" then
-        self.popupFrame:SetPoint("CENTER", UIParent, "CENTER", xOffset, yOffset)
+        frame:SetPoint("CENTER", UIParent, "CENTER", xOffset, yOffset - stackOffset)
     elseif position == "TOP" then
-        self.popupFrame:SetPoint("TOP", UIParent, "TOP", xOffset, yOffset - 50)
+        frame:SetPoint("TOP", UIParent, "TOP", xOffset, yOffset - 50 - stackOffset)
     elseif position == "BOTTOM" then
-        self.popupFrame:SetPoint("BOTTOM", UIParent, "BOTTOM", xOffset, yOffset + 50)
+        frame:SetPoint("BOTTOM", UIParent, "BOTTOM", xOffset, yOffset + 50 + stackOffset)
     elseif position == "TOPLEFT" then
-        self.popupFrame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", xOffset + 50, yOffset - 50)
+        frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", xOffset + 50, yOffset - 50 - stackOffset)
     elseif position == "TOPRIGHT" then
-        self.popupFrame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", xOffset - 50, yOffset - 50)
+        frame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", xOffset - 50, yOffset - 50 - stackOffset)
     elseif position == "BOTTOMLEFT" then
-        self.popupFrame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", xOffset + 50, yOffset + 50)
+        frame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", xOffset + 50, yOffset + 50 + stackOffset)
     elseif position == "BOTTOMRIGHT" then
-        self.popupFrame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", xOffset - 50, yOffset + 50)
+        frame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", xOffset - 50, yOffset + 50 + stackOffset)
     else
         -- Fallback to center
-        self.popupFrame:SetPoint("CENTER", UIParent, "CENTER", xOffset, yOffset)
+        frame:SetPoint("CENTER", UIParent, "CENTER", xOffset, yOffset - stackOffset)
     end
 end
