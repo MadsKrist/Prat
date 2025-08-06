@@ -7,6 +7,8 @@ Dependencies: Prat
 
 local L = AceLibrary("AceLocale-2.2"):new("PratLFGAlerts")
 
+DEFAULT_CHAT_FRAME:AddMessage("LFGAlerts file loaded!", 0, 1, 0) -- Green text
+
 L:RegisterTranslations("enUS", function() return {
     ["LFGAlerts"] = true,
     ["LFG chat monitoring and alert options."] = true,
@@ -406,6 +408,9 @@ function Prat_LFGAlerts:OnInitialize()
             }
         }
     }
+    
+    -- Debug message to confirm module loaded
+    DEFAULT_CHAT_FRAME:AddMessage("Prat LFGAlerts module loaded successfully!", 0, 1, 0) -- Green text
 end
 
 function Prat_LFGAlerts:OnEnable()
